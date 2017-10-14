@@ -1,0 +1,41 @@
+version: "2.2"
+
+services:
+  openfaas_kafka:
+    build: .
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      FAAS_KAFKA_HOSTS: "kafka:9092"
+      FAAS_KAFKA_CONSUMER_GROUP: "openfaas"
+      FAAS_KAFKA_TOPICS: "openfaas"
+
+  zookeeper:
+    image: zookeeper:3.4
+    healthcheck:
+      test: echo stat | nc localhost 2181
+      interval: 1s
+      timeout: 5s
+      retries: 10
+
+  kafka:
+    image: solsson/kafka:0.11.0.0
+    entrypoint: ./bin/kafka-server-start.sh
+    command: >-
+      ./config/server.properties
+      --override zookeeper.connect=zookeeper:2181
+      --override log.dirs=/var/lib/kafka/data/topics
+      --override log.retention.hours=-1
+      --override broker.id=0
+      --override advertised.listener=PLAINTEXT://kafka:9092
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test: nc -z localhost 9092
+      interval: 1st
+      timeout: 5s
+      retries: 10
+    depends_on:
+      zookeeper:
+        condition: service_healthy
